@@ -1,0 +1,138 @@
+<html>
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <title>MQTT Data - Real Time</title>
+  <style type="text/css">
+  #div_g {
+    position: absolute;
+    left: 10px;
+    right: 10px;
+    top: 40px;
+    bottom: 10px;
+  }
+</style>
+
+<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.8.2/jquery.min.js"></script>
+<script src="dygraph-combined-dev.js"></script>
+<script src="mqttws31.js" type="text/javascript"></script>
+<script type="text/javascript">
+
+
+/*
+by @bordignon on twitter Feb 2014
+Adapted for Dycharts by Malcolm Yeoman
+
+*/
+
+//settings BEGIN
+var MQTTbroker = '172.20.10.2';
+var MQTTport = 9001;
+var MQTTsubTopic = 'wspacket';
+//settings END
+
+var chart; // global variable for chart
+var data = [];
+var g;
+var roll,pitch,yaw;
+
+//mqtt broker
+var client = new Paho.MQTT.Client(MQTTbroker, MQTTport,
+  "myclientid_" + parseInt(Math.random() * 100, 10));
+  client.onMessageArrived = onMessageArrived;
+  client.onConnectionLost = onConnectionLost;
+
+  //mqtt connecton options including the mqtt broker subscriptions
+  var options = {
+    timeout: 3,
+    onSuccess: function () {
+      console.log("mqtt connected");
+      // Connection succeeded; subscribe to our topics
+
+      var connected_msg = "Javascript ws Dygraph connected";
+      message = new Paho.MQTT.Message(connected_msg);
+      message.destinationName = "ws";
+      client.send(message);
+
+      client.subscribe(MQTTsubTopic, {qos: 1});
+    },
+    onFailure: function (message) {
+      console.log("Connection failed, ERROR: " + message.errorMessage);
+      //window.setTimeout(location.reload(),20000); //wait 20seconds before trying to connect again.
+    }
+  };
+
+  //can be used to reconnect on connection lost
+  function onConnectionLost(responseObject) {
+    console.log("connection lost: " + responseObject.errorMessage);
+    window.setTimeout(location.reload(),20000); //wait 20seconds before trying to connect again.
+  };
+
+  //what is done when a message arrives from the broker
+  function onMessageArrived(message) {
+    //console.log(message.destinationName, '',message.payloadString);
+
+
+
+    //var x = new Date();  // current time
+    //var thenum = parseFloat(message.payloadString); //remove any text spaces from the message
+    var parse = (message.payloadString).split(",");
+    roll = parseFloat(parse[5]);
+    pitch = parseFloat(parse[6]);
+    yaw = parseFloat(parse[7]);
+    //data.push([x,parseFloat(parse[5]), parseFloat(parse[6]), parseFloat(parse[7])]);
+    //data.push([x,parseFloat(parse[5])]);
+    //data.push([y,parseFloat(parse[6])]);
+    //data.push([z,parseFloat(parse[7])]);
+    //data.shift();
+    //g.updateOptions( { 'file': data } );
+
+  };
+
+  //check if a real number
+  function isNumber(n) {
+    return !isNaN(parseFloat(n)) && isFinite(n);
+  };
+
+  //function that is called once the document has loaded
+  function init() {
+
+    // Connect to MQTT broker
+    client.connect(options);
+  };
+
+  //settings for the chart
+
+  $(document).ready(function () {
+    var data = [];
+    var t = new Date();
+    for (var i = 100; i >= 0; i--) {
+      var x = new Date(t.getTime() - i * 1000);
+      data.push([x, 0, 0, 0]);
+    }
+
+    var g = new Dygraph(document.getElementById("div_g"), data,
+    {
+      drawPoints: true,
+      showRoller: true,
+      //valueRange: [0.0, 1.2],
+      labels: ['Time', 'roll', 'pitch', 'yaw']
+    });
+    // It sucks that these things aren't objects, and we need to store state in window.
+    window.intervalId = setInterval(function() {
+      var x = new Date();  // current time
+      data.push([x,roll, pitch, yaw]);
+      g.updateOptions( { 'file': data } );
+    }, 1000);
+  }
+);
+
+
+
+</script>
+</head>
+<body onload="init();"><!--Start the javascript ball rolling and connect to the mqtt broker-->
+
+  <div id="div_g" ></div>
+
+</body>
+</html>
